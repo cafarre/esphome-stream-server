@@ -31,13 +31,21 @@ void StreamServerComponent::setup() {
     this->socket_->listen(8);
 
     this->publish_sensor();
+
+    //CAF: COM port read
+    while (this->available() != 0) {
+      this->read();
+    }
+    ESP_LOGCONFIG(TAG, "[CAF]Server is up and COM Port is all read...");
 }
 
 void StreamServerComponent::loop() {
     this->accept();
+    //CAF
+    this->write();
     this->read();
     this->flush();
-    this->write();
+    //this->write();
     this->cleanup();
 }
 
@@ -50,6 +58,13 @@ void StreamServerComponent::dump_config() {
 #ifdef USE_SENSOR
     LOG_SENSOR("  ", "Connection count:", this->connection_count_sensor_);
 #endif
+
+    //CAF
+    this->check_uart_settings(115200, 1, esphome::uart::UART_CONFIG_PARITY_NONE, 8);
+    ESP_LOGCONFIG(TAG, "pylontech:");
+    if (this->is_failed()) {
+      ESP_LOGE(TAG, "Connection with pylontech failed!");
+    }
 }
 
 void StreamServerComponent::on_shutdown() {
@@ -91,6 +106,9 @@ void StreamServerComponent::cleanup() {
     }
 }
 
+/*
+  Read from uart and write to buffer
+*/
 void StreamServerComponent::read() {
     size_t len = 0;
     int available;
@@ -119,6 +137,9 @@ void StreamServerComponent::read() {
     }
 }
 
+/*
+  Read from buffer and write to tcp socket
+*/
 void StreamServerComponent::flush() {
     ssize_t written;
     this->buf_tail_ = this->buf_head_;
@@ -149,6 +170,9 @@ void StreamServerComponent::flush() {
     }
 }
 
+/*
+  Read from TCP socket and write to uart
+*/
 void StreamServerComponent::write() {
     uint8_t buf[128];
     ssize_t read;
